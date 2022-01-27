@@ -15,6 +15,32 @@ class TestPlayer(unittest.TestCase):
         pass
 
     @mock.patch('pdgatools.requests.get', mock.Mock(side_effect=requests_get))
+    def test_init(self):
+        # Init sets basic player stats
+        p = Player(41760)
+        self.assertEqual('Kevin Jones', p.name)
+        self.assertEqual('Greenwood, Arkansas, United States', p.location)
+        self.assertEqual(2009, p.since)
+        self.assertEqual(1036, p.rating)
+        self.assertEqual('Professional', p.classification)
+        self.assertEqual(179, p.events)
+        self.assertEqual(41, p.wins)
+        self.assertEqual(156998.99, p.earnings)
+
+    @mock.patch('pdgatools.requests.get', mock.Mock(side_effect=requests_get))
+    def test_init_new_player(self):
+        # Some fields not present: rating, events, etc
+        p = Player(198422)
+        self.assertEqual('Russell Van Leuven', p.name)
+        self.assertEqual('Vancouver, Washington, United States', p.location)
+        self.assertEqual(2021, p.since)
+        self.assertEqual(None, p.rating)
+        self.assertEqual('Amateur', p.classification)
+        self.assertEqual(0, p.events)
+        self.assertEqual(0, p.wins)
+        self.assertEqual(0.0, p.earnings)
+
+    @mock.patch('pdgatools.requests.get', mock.Mock(side_effect=requests_get))
     def test_included_round_ratings(self):
         # Use Kevin Jones results downloaded January 2022.
         p = Player(41760)
@@ -191,53 +217,48 @@ def get_web_page(url):
     html_dir = 'html'
     file = ''
     content = ''
-    status_code = 404
+    status_code = 200
     if url == 'https://www.pdga.com/player/41760/details':
         file = 'kj_included.html'
-        status_code = 200
     elif url == 'https://www.pdga.com/player/44382/details':
         file = 'ab_included.html'
-        status_code = 200
     elif url == 'https://www.pdga.com/player/41760/stats/2020':
         file = 'kj_stats_2020.html'
-        status_code = 200
-    elif url == 'https://www.pdga.com/player/41760/stats/2021':
+    elif url == 'https://www.pdga.com/player/41760/stats/2021' or url == 'https://www.pdga.com/player/41760':
         file = 'kj_stats_2021.html'
-        status_code = 200
     elif url == 'https://www.pdga.com/player/41760/stats/2022':
         # The PDGA site returns the results from the last year they had records.
         # In this case, we pretend that 2021 was the last year they did so.
         file = 'kj_stats_2021.html'
-        status_code = 200
     elif url == 'https://www.pdga.com/player/140592/stats/2020':
         file = 'tn_stats_2020.html'
-        status_code = 200
     elif url == 'https://www.pdga.com/player/44382/stats/2021':
         file = 'ab_stats_2021.html'
-        status_code = 200
-    elif url == 'https://www.pdga.com/player/44382/stats/2022':
+    elif url == 'https://www.pdga.com/player/44382/stats/2022' or url == 'https://www.pdga.com/player/44382':
         file = 'ab_stats_2022.html'
-        status_code = 200
+    elif url == 'https://www.pdga.com/player/68286':
+        file = 'nq_stats_2022.html'
+    elif url == 'https://www.pdga.com/player/140592':
+        file = 'tn_stats_2021.html'
+    elif url == 'https://www.pdga.com/player/198422':
+        file = 'rvl_stats.html'
     elif url == 'https://www.pdga.com/tour/event/47877':
         # Las Vegas Challenge presented by Innova 2021
         file = 'lvc_event.html'
-        status_code = 200
     elif url == 'https://www.pdga.com/tour/event/51685':
         # Long Drive Contest at 2021 Pro Worlds 2021
         file = 'ldc_event.html'
-        status_code = 200
     elif url == 'https://www.pdga.com/tour/event/51684':
         # Putting Contest at 2021 Pro Worlds
         file = 'pcw_event.html'
-        status_code = 200
     elif url == 'https://www.pdga.com/tour/event/47932':
         # Savannah Open 2021
         file = 'so_event.html'
-        status_code = 200
     elif url == 'https://www.pdga.com/tour/event/55325':
         # Shelly Sharpe Memorial 2022
         file = 'ssm_event.html'
-        status_code = 200
+    else:
+        status_code = 404
     if file:
         with open(os.path.join(test_dir, html_dir, file), 'r') as f:
             content = f.read()

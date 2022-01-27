@@ -22,6 +22,7 @@ class TournamentResult:
     start_date: datetime.date
     end_date: datetime.date
 
+
 @dataclass
 class RoundResult:
     """Dataclass to represent a disc golf round result."""
@@ -30,22 +31,56 @@ class RoundResult:
     score: int
     rating: float
 
+
 @dataclass
 class RoundRating:
     """Dataclass to represent a disc golf round rating."""
     date: datetime.date
     rating: int
 
+
 class Player:
-    """Tools to scrape stats and info about a disc golf player from the PDGA website."""
+    """Tools to scrape stats and info about a disc golf player from the PDGA website.
+    
+    Attributes:
+        pdga_number (int): The players PDGA number.
+        name (str): The name of the player.
+        location (str): The location of the player.
+        since (int): The year that the player became a member of the PDGA.
+        rating (int): Tha player current rating.
+        classification (str): Wether the player is a professional or not.
+        events (int): Number of events played throughout the players career.
+        wins (int): Number of wins throughout the players career.
+        earnings (float): Career earnings in USD.
+    """
 
     def __init__(self, pdga_number):
-        """Create a new Player instance.
+        """Create a new Player instance and populate attributes.
         
+        NOTE: This function will have to be updated if the PDGA website changes.
+
         Args:
             pdga_number (int): The players PDGA number.
         """
         self.pdga_number = str(pdga_number)
+
+        # Get and parse player info from pdga.com:
+        html = requests.get(f'https://www.pdga.com/player/{self.pdga_number}').text
+        soup = BeautifulSoup(html, 'html.parser')
+        ul = soup.find('ul', class_='player-info')
+        self.name = soup.find('h1', id='page-title').text.split('#')[0].strip()
+        # Split at "Classification" to mitigate that the location li-tag isn't closed.
+        self.location = ul.find('li', class_='location').text.split('Classification:')[0].removeprefix('Location:').strip()
+        self.since = int(re.findall(r'\d+', ul.find('li', class_='join-date').text)[0])
+        rating = ul.find('li', class_='current-rating')
+        self.rating = int(re.findall(r'\d+', rating.text)[0]) if rating else None
+        self.classification = ul.find('li', class_='classification').text.removeprefix('Classification:').strip()
+        events = ul.find('li', class_='career-events')
+        self.events = int(re.findall(r'\d+', events.text)[0]) if events else 0
+        wins = ul.find('li', class_='career-wins')
+        self.wins = int(re.findall(r'\d+', wins.text)[0]) if wins else 0
+        earnings = ul.find('li', class_='career-earnings')
+        self.earnings = float(re.findall(r'[\d,\.]+', earnings.text)[0].replace(',', '')) if earnings else 0.0
 
     def included_round_ratings(self) -> list[RoundRating]:
         """Get all round ratings included in latest rating.
@@ -235,6 +270,11 @@ class Rating:
 
     def update(self, round_ratings: list[RoundRating], order: DataOrder=DataOrder.RECENT_FIRST, as_of: datetime.date=None, most_recent_round_date: datetime.date=None):
         """Update rating using given data. This will update the rating, included and (optionally) as_of attributes.
+
+        Calulcations aren't perfect, but get's very close. According to a PDGA official "additional, minor items are kept
+        confidential by the PDGA". Also, we can only access published round ratings which are "converted to integers, but¨
+        the ratings algorithm uses round ratings as real numbers". This means our calculations will sometimes be rounded
+        to the wrong integer.
 
         Args:
             round_ratings (list[RoundRatings]): A list of round ratings.
