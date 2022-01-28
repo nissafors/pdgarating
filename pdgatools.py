@@ -3,12 +3,11 @@
 __copyright__ = "Copyright (C) 2022 Andreas Andersson"
 __license__ = "The MIT License"
 
-import enum
-import requests
-from bs4 import BeautifulSoup
-import datetime, re, dateutil.relativedelta
-from dataclasses import dataclass
+import enum, requests, re, cmd
+import datetime, dateutil.relativedelta
 import math, statistics
+from bs4 import BeautifulSoup
+from dataclasses import dataclass
 
 @dataclass
 class TournamentResult:
@@ -37,6 +36,10 @@ class RoundRating:
     """Dataclass to represent a disc golf round rating."""
     date: datetime.date
     rating: int
+
+
+class InvalidPDGANumberError(Exception):
+    pass
 
 
 class Player:
@@ -69,6 +72,8 @@ class Player:
         soup = BeautifulSoup(html, 'html.parser')
         ul = soup.find('ul', class_='player-info')
         self.name = soup.find('h1', id='page-title').text.split('#')[0].strip()
+        if self.name == 'Page not found':
+            raise InvalidPDGANumberError
         # Split at "Classification" to mitigate that the location li-tag isn't closed.
         self.location = ul.find('li', class_='location').text.split('Classification:')[0].removeprefix('Location:').strip()
         self.since = int(re.findall(r'\d+', ul.find('li', class_='join-date').text)[0])
@@ -220,8 +225,9 @@ class Player:
         for e in new_events:
             round_results = self.round_results_for_event(e.event_url)
             for r in round_results:
-                # There's no way to extract round dates, so we'll have to go with event date.
-                round_ratings.append(RoundRating(e.end_date, r.rating))
+                if r.rating:
+                    # There's no way to extract round dates, so we'll have to go with event date.
+                    round_ratings.append(RoundRating(e.end_date, r.rating))
         # Calculate new rating
         rating = Rating()
         rating.update(round_ratings, order=Rating.DataOrder.UNSORTED)

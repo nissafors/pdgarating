@@ -201,8 +201,20 @@ class TestPlayer(unittest.TestCase):
 
     @mock.patch('pdgatools.requests.get', mock.Mock(side_effect=requests_get))
     def test_estimate_next_rating(self):
+        # Anthony Barela at this point had played one more event which increased his rating
+        # from 1024 to 1026.
         p = Player(44382)
         expected = 1026
+        actual = p.estimate_next_rating()
+        self.assertEqual(expected, actual)
+
+    @mock.patch('pdgatools.requests.get', mock.Mock(side_effect=requests_get))
+    def test_estimate_next_rating_rounds_wo_rating(self):
+        # Sometimes events includes rounds that aren't rated. This shouldn't cause errors.
+        # In this case Nathan Queen played an event after his last rating that included
+        # a short final round that wasn't rated.
+        p = Player(68286)
+        expected = 1027
         actual = p.estimate_next_rating()
         self.assertEqual(expected, actual)
 
@@ -222,6 +234,8 @@ def get_web_page(url):
         file = 'kj_included.html'
     elif url == 'https://www.pdga.com/player/44382/details':
         file = 'ab_included.html'
+    elif url == 'https://www.pdga.com/player/68286/details':
+        file = 'nq_included.html'
     elif url == 'https://www.pdga.com/player/41760/stats/2020':
         file = 'kj_stats_2020.html'
     elif url == 'https://www.pdga.com/player/41760/stats/2021' or url == 'https://www.pdga.com/player/41760':
@@ -236,7 +250,7 @@ def get_web_page(url):
         file = 'ab_stats_2021.html'
     elif url == 'https://www.pdga.com/player/44382/stats/2022' or url == 'https://www.pdga.com/player/44382':
         file = 'ab_stats_2022.html'
-    elif url == 'https://www.pdga.com/player/68286':
+    elif url == 'https://www.pdga.com/player/68286/stats/2022' or url == 'https://www.pdga.com/player/68286':
         file = 'nq_stats_2022.html'
     elif url == 'https://www.pdga.com/player/140592':
         file = 'tn_stats_2021.html'
@@ -257,6 +271,9 @@ def get_web_page(url):
     elif url == 'https://www.pdga.com/tour/event/55325':
         # Shelly Sharpe Memorial 2022
         file = 'ssm_event.html'
+    elif url == 'https://www.pdga.com/tour/event/55390':
+        # Savannah Open 2022
+        file = 'so2022_event.html'
     else:
         status_code = 404
     if file:
@@ -266,3 +283,7 @@ def get_web_page(url):
 
 if __name__ == '__main__':
     unittest.main()
+    #with open('nq_included.html', 'w') as f:
+    #    import requests
+    #    html = requests.get('https://www.pdga.com/player/68286/details').text
+    #    f.write(html)
