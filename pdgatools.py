@@ -1,4 +1,4 @@
-"""Tools to get and work with player data from the PDGA website."""
+"""Tools to get and work with data from the PDGA website."""
 
 __copyright__ = "Copyright (C) 2022 Andreas Andersson"
 __license__ = "The MIT License"
@@ -390,3 +390,134 @@ class Rating:
         """
         i = len(round_ratings) if len(round_ratings) < 9 else math.ceil(0.75 * len(round_ratings))
         return round_ratings + round_ratings[i:]
+
+
+class CLI(cmd.Cmd):
+    """Simple command-line interface to use some of the tools.
+    
+    Usage:
+        cli = CLI()
+        cli.cmdloop()
+    """
+
+    ERR_INVALID_ARGS = 'Invalid argument.'
+    ERR_INVALID_PDGA_NUM = 'Invalid PDGA number.'
+    ERR_NO_CONNECTION = 'No connection.'
+    ERR_NO_PLAYER = 'No player loaded.'
+
+    def __init__(self):
+        """Create a new CLI instance."""
+        super().__init__()
+        self.prompt = '[pdgatools] > '
+        self.player = None
+
+    def err(self, msg: str):
+        """Print an error message.
+        
+        Args:
+            msg (str): The message to print.
+        """
+        print(f'ERROR: {msg}')
+
+    def check_player_loaded(self) -> bool:
+        """Checks if a player is currently loaded and prints an error message if not.
+        
+        Returns:
+            bool: True if a player is loaded, False if not.
+        """
+        if not self.player:
+            self.err(CLI.ERR_NO_PLAYER)
+            return False
+        return True
+
+    # COMMANDS
+
+    def do_load(self, args: str):
+        """ARGS: PDGA-NUMBER. Load new player."""
+        try:
+            pdga_number = int(args)
+            self.player = Player(pdga_number)
+            print(f'Loaded: #{self.player.pdga_number}: {self.player.name}')
+        except InvalidPDGANumberError:
+            self.err(CLI.ERR_INVALID_PDGA_NUM)
+        except ValueError:
+            self.err(CLI.ERR_INVALID_PDGA_NUM)
+        except IndexError:
+            self.err(CLI.ERR_INVALID_ARGS)
+        except ConnectionError:
+            self.err(CLI.ERR_NO_CONNECTION)
+
+    def do_info(self, _):
+        """Show player info."""
+        if not self.check_player_loaded():
+            return
+        print(f'#{self.player.pdga_number}\nName: {self.player.name}')
+        print(f'Location: {self.player.location}\nMember since: {self.player.since}\nClassification: {self.player.classification}')
+        if self.player.rating:
+            print(f'Current rating: {self.player.rating}')
+        print(f'Career events: {self.player.events}\nCareer wins: {self.player.wins}\nCareer earnings: ${self.player.earnings:.2f}')
+
+    def do_predict(self, _):
+        """Predict next rating."""
+        if not self.check_player_loaded():
+            return
+        try:
+            print(self.player.estimate_next_rating())
+        except ConnectionError:
+            self.err(CLI.ERR_NO_CONNECTION)
+
+    def do_included(self, _):
+        """Show round ratings included in latest official rating update."""
+        if not self.check_player_loaded():
+            return
+        try:
+            for r in self.player.included_round_ratings():
+                print(f'Date: {r.date.isoformat()}, Rating: {r.rating}')
+        except ConnectionError:
+            self.err(CLI.ERR_NO_CONNECTION)
+
+    def do_events(self, args: str):
+        """ARGS: START-DATE [END-DATE]. Show events played in given period. Date format is YYYY-MM-DD."""
+        if not self.check_player_loaded():
+            return
+        try:
+            argv = args.split()
+            if len(argv) < 1 or len(argv) > 2:
+                self.err(CLI.ERR_INVALID_ARGS)
+                return
+            start = datetime.date.fromisoformat(argv[0])
+            end = datetime.date.today() if len(argv) == 1 else datetime.date.fromisoformat(argv[1])
+            if start > end:
+                self.err(CLI.ERR_INVALID_ARGS)
+                return
+            events = self.player.events_from_period(start, end)
+            if events:
+                print('Place Points Division Tier Dates' + ' ' * 20 + 'Tournament')
+                for e in events:
+                    print(f'{e.place:<6}{e.points:<7}{e.division:9}{e.tier:5}{e.start_date.isoformat()} to {e.end_date.isoformat()} {e.tournament} ({e.event_url})')
+        except ConnectionError:
+            self.err(CLI.ERR_NO_CONNECTION)
+        except ValueError:
+            self.err(CLI.ERR_INVALID_ARGS)
+
+    def do_rounds(self, args):
+        """ARGS: EVENT-URL. Show round results for given event."""
+        if not self.check_player_loaded():
+            return
+        try:
+            round_results = self.player.round_results_for_event(args)
+            if round_results:
+                print('Score Par Rating Course')
+                for r in round_results:
+                    print(f'{r.score:<6}{r.par:<4}{r.rating:<7}{r.course}')
+        except ConnectionError:
+            self.err(CLI.ERR_NO_CONNECTION)
+
+    def do_exit(self, _):
+        """Exit pdgatools CLI."""
+        return True
+
+
+if __name__ == '__main__':
+    cli = CLI()
+    cli.cmdloop()
